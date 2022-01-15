@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import FeatureLayer from '@arcgis/core/layers/FeatureLayer'
 import Graphic from '@arcgis/core/Graphic'
 import Point from '@arcgis/core/geometry/Point'
+import Field from '@arcgis/core/layers/support/Field'
 
 const queryWaterQuality = async (point, dist) => {
     console.log(point, dist)
@@ -15,15 +16,28 @@ const queryWaterQuality = async (point, dist) => {
             latitude: d.lat,
             longitude: d.long
         })
+        const symbol = {
+            type: "text",
+            color: "#7A003C",
+            text: "\ue651",
+            font: {
+                size: 20,
+                family: "CalciteWebCoreIcons"
+            }
+        }
 
+        const attrs = {
+            url: d['@id'],
+            notation: d.notation
+        }
         const graphic = new Graphic({
             geometry: geom,
+
             attributes: {
-                // label: d.label,
-                // area: d.area.label,
-                notation: "test url"
-                // notation: "Test"
-            }
+                // OBJECTID: 0,
+                url: "test"
+            },
+            symbol: symbol,
         })
         graphics.push(graphic)
     });
@@ -31,29 +45,19 @@ const queryWaterQuality = async (point, dist) => {
 }
 
 const graphicsToFeatureLayer = graphics => {
-    return new FeatureLayer({
+    console.log(graphics)
+    const _fl = new FeatureLayer({
         source: graphics,
         objectIdField: "OBJECTID",
         fields: [
-            {
-                name: "OBJECTID",
-                type: "oid"
-            },
-            {
-                name: "notation",
-                type: "string"
-            },
-            {
-                name: "url",
-                type: "string"
-            },
+            new Field({ name: "OBJECTID", type: "oid", })
         ],
         popupTemplate: {
             title: (d) => {
                 console.log(d)
                 return "hello World"
             },
-            content: "<img src='{url}'>"
+            content: `<h1>${d['id']}</h1>`
         },
         renderer: {
             type: "simple",
@@ -68,6 +72,23 @@ const graphicsToFeatureLayer = graphics => {
             }
         }
     });
+    // _fl.set({
+    //     fields: [
+    //         new Field({ name: "OBJECTID", type: "oid" }),
+    //         new Field({ name: "url", type: "string", alias: "URL" }),
+    //         new Field({ name: "notation", type: "string" }),
+
+    //         // {
+    //         //     name: "notation",
+    //         //     type: "string"
+    //         // },
+    //         // {
+    //         //     name: "url",
+    //         //     type: "string"
+    //         // },
+    //     ],
+    // })
+    return _fl
 
 }
 
