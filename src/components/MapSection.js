@@ -6,10 +6,11 @@ import { CalciteButton, CalciteSlider } from '@esri/calcite-components-react'
 import "@esri/calcite-components/dist/calcite/calcite.css";
 import { graphicsToFeatureLayer, queryWaterQuality } from '../utils/mapHelper'
 
-const destroyWidget = widget => {
+const destroyWidget = (widget, searchContainer) => {
+
     if (widget) {
         try {
-            widget.remove()
+            widget.destroy()
         } catch (TypeError) {
             console.log("Widget already destroyed")
         }
@@ -24,6 +25,7 @@ const MapSection = () => {
     const [searchResultPoint, setSearchResultPoint] = useState()
     const [samplePointsFL, setSamplePointsFL] = useState()
     const [searchDistance, setsearchDistance] = useState(1)
+    const [searchWidget, setsearchWidget] = useState()
     const [mapView, setMapView] = useState()
     const mapContainer = useRef()
     const searchContainer = useRef()
@@ -35,17 +37,7 @@ const MapSection = () => {
     }
 
     useEffect(() => {
-        if (!mapContainer.current) return
-
-        const view = new MapView({
-            center: [-115, 34.02],
-            zoom: 5,
-            container: mapContainer.current,
-            map: webMap
-        });
-        setMapView(view);
-        const searchWidget = new Search({ view: view, container: searchContainer.current })
-
+        const searchWidget = new Search({ view: mapView, container: searchContainer.current, popupEnabled: false })
         searchWidget.on("search-complete", (e) => {
             const x = e.results[0]["results"][0].feature.geometry.longitude
             const y = e.results[0]["results"][0].feature.geometry.latitude
@@ -55,13 +47,46 @@ const MapSection = () => {
             setSearchResultPoint(null)
             webMap.removeAll()
         })
-        return () => destroyWidget(searchWidget)
+        return () => searchWidget.destroy()
+
+    }, [mapView, searchContainer.current])
+
+    useEffect(() => {
+        if (!mapContainer.current) return
+
+        const view = new MapView({
+            center: [-115, 34.02],
+            zoom: 5,
+            container: mapContainer.current,
+            map: webMap
+        });
+
+        setMapView(view);
     }, [])
+
+    // useEffect(() => {
+    //     if (!searchWidget) return
+    //     searchWidget.view = mapView
+    // }, [mapView])
 
     useEffect(() => {
         webMap.removeAll()
+        if (!samplePointsFL) return
         if (samplePointsFL) webMap.add(samplePointsFL)
+
+        samplePointsFL.queryExtent().then(res => {
+            console.log(res.extent)
+            mapView.goTo(res.extent)
+        })
     }, [samplePointsFL])
+
+    // view.whenLayerView(layer).then(function(layerView){
+    //     layerView.watch("updating", function(val){
+    //       // wait for the layer view to finish updating
+    //       if(!val){
+    //       }
+    //     });
+    //   });
 
 
     return (
@@ -71,7 +96,6 @@ const MapSection = () => {
                 gridTemplateColumns: '1fr 1fr 1fr',
                 gap: '4em',
                 marginBottom: '20px'
-
             }}>
                 <div ref={searchContainer} style={{ margin: '0em' }}></div>
                 <div>

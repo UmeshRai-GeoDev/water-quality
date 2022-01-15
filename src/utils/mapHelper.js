@@ -10,6 +10,7 @@ const queryWaterQuality = async (point, dist) => {
     const graphics = []
 
     water_sample_points.items && water_sample_points.items.forEach(d => {
+
         const geom = new Point({
             latitude: d.lat,
             longitude: d.long
@@ -18,9 +19,10 @@ const queryWaterQuality = async (point, dist) => {
         const graphic = new Graphic({
             geometry: geom,
             attributes: {
-                label: d.label,
-                area: d.area.label,
-                url: d['@id']
+                // label: d.label,
+                // area: d.area.label,
+                notation: "test url"
+                // notation: "Test"
             }
         })
         graphics.push(graphic)
@@ -38,22 +40,18 @@ const graphicsToFeatureLayer = graphics => {
                 type: "oid"
             },
             {
+                name: "notation",
+                type: "string"
+            },
+            {
                 name: "url",
                 type: "string"
-            }
+            },
         ],
         popupTemplate: {
-            title: (event) => {
-                return locator
-                    .locationToAddress({
-                        location: event.graphic.geometry
-                    })
-                    .then((response) => {
-                        return response.address;
-                    })
-                    .catch((error) => {
-                        return "The middle of nowhere";
-                    });
+            title: (d) => {
+                console.log(d)
+                return "hello World"
             },
             content: "<img src='{url}'>"
         },
