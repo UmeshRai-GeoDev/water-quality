@@ -6,12 +6,12 @@ import { CalciteButton, CalciteSlider } from '@esri/calcite-components-react'
 import "@esri/calcite-components/dist/calcite/calcite.css";
 import { graphicsToFeatureLayer, queryWaterQuality } from '../utils/mapHelper'
 
-const destroyWidget = widget => {
+const destroyWidget = (widget, searchContainer) => {
+
     if (widget) {
         try {
-            widget.remove()
+            widget.destroy()
         } catch (TypeError) {
-            console.log("Widget already destroyed")
         }
     }
 }
@@ -24,28 +24,37 @@ const MapSection = () => {
     const [searchResultPoint, setSearchResultPoint] = useState()
     const [samplePointsFL, setSamplePointsFL] = useState()
     const [searchDistance, setsearchDistance] = useState(1)
+    const [searchWidget, setsearchWidget] = useState()
     const [mapView, setMapView] = useState()
     const mapContainer = useRef()
     const searchContainer = useRef()
 
     const btnClickHandler = async () => {
-        const samplePointsGraphics = await queryWaterQuality(searchResultPoint, searchDistance)
-        const fl = graphicsToFeatureLayer(samplePointsGraphics)
-        setSamplePointsFL(fl)
+        webMap.removeAll()
+        queryWaterQuality(searchResultPoint, searchDistance).then(samplePointsGraphics => {
+            mapView.goTo(samplePointsGraphics.map(d => d.value))
+            samplePointsGraphics.forEach(g => {
+                const _fields = new Set(Object.keys(g.value.attributes))
+                console.log(_fields)
+                g.popupTemplate = {
+                    title: '{label}',
+                    content: [
+                        {
+                            type: 'fields',
+                            fieldInfos: [..._fields].map(d => {
+                                return { fieldName: d }
+                            })
+                        }
+                    ]
+                }
+                mapView.graphics.add(g.value)
+            })
+        })
+
     }
 
     useEffect(() => {
-        if (!mapContainer.current) return
-
-        const view = new MapView({
-            center: [-115, 34.02],
-            zoom: 5,
-            container: mapContainer.current,
-            map: webMap
-        });
-        setMapView(view);
-        const searchWidget = new Search({ view: view, container: searchContainer.current })
-
+        const searchWidget = new Search({ view: mapView, container: searchContainer.current, popupEnabled: false })
         searchWidget.on("search-complete", (e) => {
             const x = e.results[0]["results"][0].feature.geometry.longitude
             const y = e.results[0]["results"][0].feature.geometry.latitude
@@ -55,23 +64,59 @@ const MapSection = () => {
             setSearchResultPoint(null)
             webMap.removeAll()
         })
-        return () => destroyWidget(searchWidget)
+        return () => searchWidget.destroy()
+
+    }, [mapView, searchContainer.current])
+
+    useEffect(() => {
+        if (!mapContainer.current) return
+
+        const view = new MapView({
+            center: [-115, 34.02],
+            zoom: 5,
+            container: mapContainer.current,
+            map: webMap,
+            popup: {
+                dockEnabled: true,
+                dockOptions: {
+                    // Disables the dock button from the popup
+                    buttonEnabled: true,
+                    // Ignore the default sizes that trigger responsive docking
+                    breakpoint: true
+                }
+            }
+        });
+
+        view.on("click", function (event) {
+            // Search for graphics at the clicked location. View events can be used
+            // as screen locations as they expose an x,y coordinate that conforms
+            // to the ScreenPoint definition.
+        });
+
+        setMapView(view);
     }, [])
+
 
     useEffect(() => {
         webMap.removeAll()
-        if (samplePointsFL) webMap.add(samplePointsFL)
+        if (!samplePointsFL) return
+        // if (samplePointsFL) webMap.add(samplePointsFL)
+
+        samplePointsFL.queryExtent().then(res => {
+            mapView.goTo(res.extent)
+        })
     }, [samplePointsFL])
 
 
+
+
     return (
-        <section style={{ padding: "2em" }}>
+        <section style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
             <section style={{
+                padding: '2em',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr 1fr',
                 gap: '4em',
-                marginBottom: '20px'
-
             }}>
                 <div ref={searchContainer} style={{ margin: '0em' }}></div>
                 <div>
@@ -84,7 +129,7 @@ const MapSection = () => {
                 }
             </section>
 
-            <div ref={mapContainer} style={{ height: '400px', width: '100%' }} />
+            <div ref={mapContainer} style={{ minHeight: '400px', width: '100%', flexGrow: 1 }} />
         </section>
     )
 }
