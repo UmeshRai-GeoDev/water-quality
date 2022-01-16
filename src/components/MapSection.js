@@ -12,7 +12,6 @@ const destroyWidget = (widget, searchContainer) => {
         try {
             widget.destroy()
         } catch (TypeError) {
-            console.log("Widget already destroyed")
         }
     }
 }
@@ -31,9 +30,27 @@ const MapSection = () => {
     const searchContainer = useRef()
 
     const btnClickHandler = async () => {
-        const samplePointsGraphics = await queryWaterQuality(searchResultPoint, searchDistance)
-        const fl = graphicsToFeatureLayer(samplePointsGraphics)
-        setSamplePointsFL(fl)
+        webMap.removeAll()
+        queryWaterQuality(searchResultPoint, searchDistance).then(samplePointsGraphics => {
+            mapView.goTo(samplePointsGraphics.map(d => d.value))
+            samplePointsGraphics.forEach(g => {
+                const _fields = new Set(Object.keys(g.value.attributes))
+                console.log(_fields)
+                g.popupTemplate = {
+                    title: '{label}',
+                    content: [
+                        {
+                            type: 'fields',
+                            fieldInfos: [..._fields].map(d => {
+                                return { fieldName: d }
+                            })
+                        }
+                    ]
+                }
+                mapView.graphics.add(g.value)
+            })
+        })
+
     }
 
     useEffect(() => {
@@ -58,44 +75,48 @@ const MapSection = () => {
             center: [-115, 34.02],
             zoom: 5,
             container: mapContainer.current,
-            map: webMap
+            map: webMap,
+            popup: {
+                dockEnabled: true,
+                dockOptions: {
+                    // Disables the dock button from the popup
+                    buttonEnabled: true,
+                    // Ignore the default sizes that trigger responsive docking
+                    breakpoint: true
+                }
+            }
+        });
+
+        view.on("click", function (event) {
+            // Search for graphics at the clicked location. View events can be used
+            // as screen locations as they expose an x,y coordinate that conforms
+            // to the ScreenPoint definition.
         });
 
         setMapView(view);
     }, [])
 
-    // useEffect(() => {
-    //     if (!searchWidget) return
-    //     searchWidget.view = mapView
-    // }, [mapView])
 
     useEffect(() => {
         webMap.removeAll()
         if (!samplePointsFL) return
-        if (samplePointsFL) webMap.add(samplePointsFL)
+        // if (samplePointsFL) webMap.add(samplePointsFL)
 
         samplePointsFL.queryExtent().then(res => {
-            console.log(res.extent)
             mapView.goTo(res.extent)
         })
     }, [samplePointsFL])
 
-    // view.whenLayerView(layer).then(function(layerView){
-    //     layerView.watch("updating", function(val){
-    //       // wait for the layer view to finish updating
-    //       if(!val){
-    //       }
-    //     });
-    //   });
+
 
 
     return (
-        <section style={{ padding: "2em" }}>
+        <section style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
             <section style={{
+                padding: '2em',
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr 1fr',
                 gap: '4em',
-                marginBottom: '20px'
             }}>
                 <div ref={searchContainer} style={{ margin: '0em' }}></div>
                 <div>
@@ -108,7 +129,7 @@ const MapSection = () => {
                 }
             </section>
 
-            <div ref={mapContainer} style={{ height: '400px', width: '100%' }} />
+            <div ref={mapContainer} style={{ minHeight: '400px', width: '100%', flexGrow: 1 }} />
         </section>
     )
 }
